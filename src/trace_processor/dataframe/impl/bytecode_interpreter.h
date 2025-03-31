@@ -365,12 +365,12 @@ class Interpreter {
   template <typename RangeOp>
   PERFETTO_ALWAYS_INLINE void SortedStringFilter(const StringPool::Id* data,
                                                  const char* val,
-                                                 BoundModifier bound,
+                                                 BoundModifier bound_modifier,
                                                  Range& update) {
     const StringPool::Id* begin = data + update.b;
     const StringPool::Id* end = data + update.e;
     if constexpr (std::is_same_v<RangeOp, EqualRange>) {
-      PERFETTO_DCHECK(bound.Is<BothBounds>());
+      PERFETTO_DCHECK(bound_modifier.Is<BothBounds>());
       std::optional<StringPool::Id> id =
           string_pool_->GetId(base::StringView(val));
       if (!id) {
@@ -388,12 +388,12 @@ class Interpreter {
       }
       update.e = update.b;
     } else if constexpr (std::is_same_v<RangeOp, LowerBound>) {
-      auto& res = bound.Is<BeginBound>() ? update.b : update.e;
+      auto& res = bound_modifier.Is<BeginBound>() ? update.b : update.e;
       const auto* it = std::lower_bound(
           begin, end, val, comparators::StringComparator<Lt>{string_pool_});
       res = it - data;
     } else if constexpr (std::is_same_v<RangeOp, UpperBound>) {
-      auto& res = bound.Is<BeginBound>() ? update.b : update.e;
+      auto& res = bound_modifier.Is<BeginBound>() ? update.b : update.e;
       const auto* it = std::upper_bound(
           begin, end, val, comparators::StringLessInvert{string_pool_});
       res = it - data;
@@ -432,23 +432,25 @@ class Interpreter {
   PERFETTO_ALWAYS_INLINE void StringFilter(
       const bytecode::StringFilterBase& sf) {
     using B = bytecode::StringFilterBase;
-    const auto& value = ReadFromRegister(sf.arg<B::val_register>());
+    const auto& filter_value = ReadFromRegister(sf.arg<B::val_register>());
     auto& update = ReadFromRegister(sf.arg<B::update_register>());
-    if (!HandleInvalidCastFilterValueResult(value, update)) {
+    if (!HandleInvalidCastFilterValueResult(filter_value, update)) {
       return;
     }
-    const char* val = base::unchecked_get<const char*>(value.value);
+    const char* val = base::unchecked_get<const char*>(filter_value.value);
     const auto& source = ReadFromRegister(sf.arg<B::source_register>());
     const StringPool::Id* ptr =
         columns_[sf.arg<B::col>()].storage.template unchecked_data<String>();
     update.e = FilterStringOp<Op>(ptr, source.b, source.e, update.b, val);
   }
 
-  PERFETTO_ALWAYS_INLINE void StrideCopy(const bytecode::StrideCopy& tr) {
+  PERFETTO_ALWAYS_INLINE void StrideCopy(
+      const bytecode::StrideCopy& stride_copy) {
     using B = bytecode::StrideCopy;
-    const auto& source = ReadFromRegister(tr.arg<B::source_register>());
-    auto& update = ReadFromRegister(tr.arg<B::update_register>());
-    uint32_t stride = tr.arg<B::stride>();
+    const auto& source =
+        ReadFromRegister(stride_copy.arg<B::source_register>());
+    auto& update = ReadFromRegister(stride_copy.arg<B::update_register>());
+    uint32_t stride = stride_copy.arg<B::stride>();
     PERFETTO_DCHECK(source.size() * stride <= update.size());
     uint32_t* write_ptr = update.b;
     for (const uint32_t* it = source.b; it < source.e; ++it) {
