@@ -113,8 +113,9 @@ class Cursor {
       case ColumnType::GetTypeIndex<Double>():
         cell_callback_impl.OnCell(c.storage.unchecked_data<Double>()[idx]);
         break;
-      case C::GetTypeIndex<String>():
-        callback.OnCell(pool_->Get(c.storage.unchecked_data<String>()[idx]));
+      case ColumnType::GetTypeIndex<String>():
+        cell_callback_impl.OnCell(
+            pool_->Get(c.storage.unchecked_data<String>()[idx]));
         break;
       default:
         PERFETTO_FATAL("Invalid storage spec");

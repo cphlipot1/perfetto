@@ -814,7 +814,7 @@ class Interpreter {
                      const char*& out) {
     if (PERFETTO_LIKELY(filter_value_type ==
                         FilterValueFetcherImpl ::kString)) {
-      out = fetcher->StringValue(handle.index);
+      out = fetcher->GetStringValue(handle.index);
       return CastFilterValueResult::kValid;
     }
     if (PERFETTO_LIKELY(filter_value_type == FilterValueFetcherImpl ::kNull)) {
