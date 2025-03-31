@@ -109,6 +109,9 @@ class Cursor {
       case C::GetTypeIndex<Double>():
         callback.OnCell(c.storage.unchecked_data<Double>()[idx]);
         break;
+      case C::GetTypeIndex<String>():
+        callback.OnCell(pool_->Get(c.storage.unchecked_data<String>()[idx]));
+        break;
       default:
         PERFETTO_FATAL("Invalid storage spec");
     }
@@ -122,7 +125,8 @@ class Cursor {
   explicit Cursor(impl::QueryPlan plan, impl::Column* columns, StringPool* pool)
       : interpeter_(std::move(plan.bytecode), columns, pool),
         params_(plan.params),
-        columns_(columns) {}
+        columns_(columns),
+        pool_(pool) {}
 
   // Bytecode interpreter that executes the query.
   impl::bytecode::Interpreter<FVF> interpeter_;
@@ -130,6 +134,8 @@ class Cursor {
   impl::QueryPlan::ExecutionParams params_;
   // Pointer to the dataframe columns.
   const impl::Column* columns_;
+  // String pool for string values.
+  StringPool* pool_;
 
   // Current position in the result set.
   uint32_t* pos_;

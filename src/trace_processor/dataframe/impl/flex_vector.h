@@ -71,8 +71,26 @@ class FlexVector {
   //
   // capacity: Initial capacity (number of elements). Must be a power of two.
   static FlexVector<T, kAlignment> CreateWithCapacity(size_t capacity) {
-    PERFETTO_CHECK(internal::IsPowerOfTwo(capacity));
-    return FlexVector(capacity);
+    return FlexVector(capacity, 0);
+  }
+
+  // Allocates a new FlexVector with the specified initial size. The values
+  // are *not* initialized; this is the main reason why this class exists vs
+  // std::vector.
+  //
+  // size: Initial size (number of elements).
+  static FlexVector<T, kAlignment> CreateWithSize(size_t size) {
+    static constexpr auto next_power_of_two = [](size_t x) {
+      size_t n = x - 1;
+      n |= n >> 1;
+      n |= n >> 2;
+      n |= n >> 4;
+      n |= n >> 8;
+      n |= n >> 16;
+      n |= n >> 32;
+      return n + 1;
+    };
+    return FlexVector(next_power_of_two(size), size);
   }
 
   // Adds an element to the end of the vector, automatically resizing if needed.
@@ -122,8 +140,8 @@ class FlexVector {
 
  private:
   // Constructor used by Alloc.
-  explicit FlexVector(size_t capacity)
-      : slab_(Slab<T, kAlignment>::Alloc(capacity)) {}
+  explicit FlexVector(size_t capacity, size_t size)
+      : slab_(Slab<T, kAlignment>::Alloc(capacity)), size_(size) {}
 
   // The underlying memory slab.
   Slab<T, kAlignment> slab_;

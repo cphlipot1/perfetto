@@ -46,6 +46,8 @@ uint32_t FilterPreference(const FilterSpec& fs, const ColumnSpec& col) {
     kIdInequality,             // Id inequality check
     kNumericSortedEq,          // Numeric sorted equality check
     kNumericSortedInequality,  // Numeric inequality check
+    kStringSortedEq,           // String sorted equality check
+    kStringSortedInequality,   // String inequality check
     kLeastPreferred,           // Least preferred
   };
   const auto& op = fs.op;
@@ -64,6 +66,14 @@ uint32_t FilterPreference(const FilterSpec& fs, const ColumnSpec& col) {
   if (n.Is<NonNull>() && col.sort_state.Is<Sorted>() &&
       ct.IsAnyOf<NumericType>() && op.IsAnyOf<InequalityOp>()) {
     return kNumericSortedInequality;
+  }
+  if (n.Is<NonNull>() && col.sort_state.Is<Sorted>() && ct.Is<String>() &&
+      op.Is<Eq>()) {
+    return kStringSortedEq;
+  }
+  if (n.Is<NonNull>() && col.sort_state.Is<Sorted>() && ct.Is<String>() &&
+      op.IsAnyOf<InequalityOp>()) {
+    return kStringSortedInequality;
   }
   return kLeastPreferred;
 }
@@ -152,7 +162,11 @@ void QueryPlanBuilder::Filter(std::vector<FilterSpec>& specs) {
       }
       continue;
     }
-    PERFETTO_FATAL("Unreachable");
+
+    PERFETTO_CHECK(ct.Is<String>());
+    auto op = non_null_op->TryDowncast<StringOp>();
+    PERFETTO_CHECK(op);
+    StringConstraint(c, *op, value_reg);
   }
 }
 
@@ -230,6 +244,21 @@ void QueryPlanBuilder::NonStringConstraint(
   {
     using B = bytecode::NonStringFilterBase;
     B& bc = AddOpcode<B>(bytecode::Index<bytecode::NonStringFilter>(type, op));
+    bc.arg<B::col>() = c.column_index;
+    bc.arg<B::val_register>() = result;
+    bc.arg<B::source_register>() = source;
+    bc.arg<B::update_register>() = EnsureIndicesAreInSlab();
+  }
+}
+
+void QueryPlanBuilder::StringConstraint(
+    const FilterSpec& c,
+    const StringOp& op,
+    const bytecode::reg::ReadHandle<CastFilterValueResult>& result) {
+  auto source = MaybeAddOverlayTranslation(c);
+  {
+    using B = bytecode::StringFilterBase;
+    B& bc = AddOpcode<B>(bytecode::Index<bytecode::StringFilter>(op));
     bc.arg<B::col>() = c.column_index;
     bc.arg<B::val_register>() = result;
     bc.arg<B::source_register>() = source;

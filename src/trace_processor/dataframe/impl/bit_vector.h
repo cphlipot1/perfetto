@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <utility>
 
 #include "perfetto/base/compiler.h"
@@ -50,16 +51,14 @@ struct BitVector {
   // Default constructor creates an empty bit vector.
   BitVector() = default;
 
-  // Allocates a new BitVector with the specified capacity of bits.
+  // Allocates a new BitVector with `size` unset bits.
   //
-  // capacity: Capacity for how many bits to allocate storage for. Must be a
-  //           power of two.
-  // Returns an empty BitVector with which has the given capacity (i.e. the
-  // ability to store `capacity` bits without allocating more storage).
-  static BitVector CreateWithCapacity(size_t capacity) {
-    PERFETTO_CHECK(internal::IsPowerOfTwo(capacity));
-    return BitVector(
-        FlexVector<uint64_t>::CreateWithCapacity(capacity / 64ull));
+  // size: Size for how many bits to add to the BitVector.
+  // Returns a BitVector with the given size and with all bits set to false.
+  static BitVector CreateWithSize(size_t size) {
+    auto words = FlexVector<uint64_t>::CreateWithSize((size + 63ull) / 64ull);
+    memset(words.data(), 0, words.size());
+    return BitVector(std::move(words));
   }
 
   // Adds a bit to the end of the vector.
