@@ -118,15 +118,13 @@ QueryPlanBuilder::QueryPlanBuilder(uint32_t row_count,
 
 void QueryPlanBuilder::Filter(std::vector<FilterSpec>& specs) {
   // Sort filters by efficiency (most selective/cheapest first)
-  std::sort(specs.begin(), specs.end(),
-            [this](const FilterSpec& a, const FilterSpec& b) {
-              const auto& a_col = columns_[a.column_index];
-              const auto& b_col = columns_[b.column_index];
-              return std::make_tuple(FilterPreference(a, a_col.spec),
-                                     a.column_index) <
-                     std::make_tuple(FilterPreference(b, b_col.spec),
-                                     b.column_index);
-            });
+  std::stable_sort(specs.begin(), specs.end(),
+                   [this](const FilterSpec& a, const FilterSpec& b) {
+                     const auto& a_col = columns_[a.column_index];
+                     const auto& b_col = columns_[b.column_index];
+                     return FilterPreference(a, a_col.spec) <
+                            FilterPreference(b, b_col.spec);
+                   });
 
   // Apply each filter in the optimized order
   for (FilterSpec& c : specs) {
